@@ -1,17 +1,13 @@
 #------------------------------------------------------------------------------
 # PROGRAM: exposure-bias-model-reader.py
 #------------------------------------------------------------------------------
-# Version 0.2
-# 4 May, 2022
+# Version 0.3
+# 16 June, 2022
 # Michael Taylor
 # https://patternizer.github.io
 # michael DOT a DOT taylor AT uea DOT ac DOT uk
 # patternizer AT gmail DOT com
 #------------------------------------------------------------------------------
-
-# PLAN A: produce HadXRUT5-analysis exposure bias field and save in CRUTEM5 format [DONE] 
-# PLAN B: update HadCRUT5-analysis field with exposure bias model and save in CRUTEM5 format
-# PLAN C: compare updated exposure bias field with LEK adjustment ( LEK - obs ) field    
 
 #------------------------------------------------------------------------------
 # IMPORT PYTHON LIBRARIES
@@ -27,16 +23,15 @@ from datetime import datetime
 # SETTINGS: 
 #------------------------------------------------------------------------------
 
-t_start = 1781
-t_end = 2021
+modelfile1 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.4_Part1_GloSAT_16.06.22.csv'
+modelfile2 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.4_Part2_GloSAT_16.06.22.csv'
+modelfile3 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.4_Part3_GloSAT_16.06.22.csv'
+modelfile4 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.4_Part4_GloSAT_16.06.22.csv'
+modelfile5 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.4_Part5_GloSAT_16.06.22.csv'
+modelfile6 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.4_Part6_GloSAT_16.06.22.csv'
+modelfile7 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.4_Part7_GloSAT_16.06.22.csv'
 
-modelfile1 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.1_Part1.csv'
-modelfile2 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.1_Part2.csv'
-modelfile3 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.1_Part3.csv'
-modelfile4 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.1_Part4.csv'
-modelfile5 = 'DATA/GloSATP04_Extratropics_ExposureBias_v0.1_Part5.csv'
-
-exposure_bias_model_file = 'OUT/df_exposure_bias.pkl'
+exposure_bias_model_file = 'df_exposure_bias.pkl'
 
 #------------------------------------------------------------------------------
 # LOAD: Emily's raw data
@@ -47,177 +42,137 @@ df2 = pd.read_csv( modelfile2 )
 df3 = pd.read_csv( modelfile3 ) 
 df4 = pd.read_csv( modelfile4 ) 
 df5 = pd.read_csv( modelfile5 ) 
+df6 = pd.read_csv( modelfile6 ) 
+df7 = pd.read_csv( modelfile7 ) 
 
-# Index(['index', 'stationcode', 'exposure_category', 'bias_estimate',
-#       'bias_estimate_2.5', 'bias_estimate_97.5', 'source_flag', 'exposurecorrected_flag'],
-#      dtype='object')
+# Index(['index', 'stationcode', 'exposure_category', 'bias_estimate', 'bias_estimate_2.5', 'bias_estimate_97.5', 'source_flag', 'exposurecorrected_flag'], dtype='object')
 
 #------------------------------------------------------------------------------
 # MUNGE
 #------------------------------------------------------------------------------
 
-# FIX: date list [ mixed format dd/mm/yyyy & yyyy-mm-dd --> datetime64 ]
+# CONCATENATE: timestamps (yyyy-mm-dd --> datetime64)
 
 datetimes1 = df1[ df1.columns[0] ]
 datetimes2 = df2[ df2.columns[0] ]
 datetimes3 = df3[ df3.columns[0] ]
 datetimes4 = df4[ df4.columns[0] ]
 datetimes5 = df5[ df5.columns[0] ]
+datetimes6 = df6[ df6.columns[0] ]
+datetimes7 = df7[ df7.columns[0] ]
 
-split1a = [ datetimes1[i].split('/') for i in range(len(datetimes1)) ]
-split2a = [ datetimes2[i].split('/') for i in range(len(datetimes2)) ]
-split3a = [ datetimes3[i].split('/') for i in range(len(datetimes3)) ]
-split4a = [ datetimes4[i].split('/') for i in range(len(datetimes4)) ]
-split5a = [ datetimes5[i].split('/') for i in range(len(datetimes5)) ]
+datetimes1_standardized = list( pd.to_datetime(datetimes1, format='%Y-%m-%d') )
+datetimes2_standardized = list( pd.to_datetime(datetimes2, format='%Y-%m-%d') )
+datetimes3_standardized = list( pd.to_datetime(datetimes3, format='%Y-%m-%d') )
+datetimes4_standardized = list( pd.to_datetime(datetimes4, format='%Y-%m-%d') )
+datetimes5_standardized = list( pd.to_datetime(datetimes5, format='%Y-%m-%d') )
+datetimes6_standardized = list( pd.to_datetime(datetimes6, format='%Y-%m-%d') )
+datetimes7_standardized = list( pd.to_datetime(datetimes7, format='%Y-%m-%d') )
 
-split1b = [ datetimes1[i].split('-') for i in range(len(datetimes1)) ]
-split2b = [ datetimes2[i].split('-') for i in range(len(datetimes2)) ]
-split3b = [ datetimes3[i].split('-') for i in range(len(datetimes3)) ]
-split4b = [ datetimes4[i].split('-') for i in range(len(datetimes4)) ]
-split5b = [ datetimes5[i].split('-') for i in range(len(datetimes5)) ]
+datetimes = datetimes1_standardized + datetimes2_standardized + datetimes3_standardized + datetimes4_standardized + datetimes5_standardized + datetimes6_standardized + datetimes7_standardized
 
-nsplit1a = [ len(datetimes1[i].split('/')) for i in range(len(datetimes1)) ]
-nsplit2a = [ len(datetimes2[i].split('/')) for i in range(len(datetimes2)) ]
-nsplit3a = [ len(datetimes3[i].split('/')) for i in range(len(datetimes3)) ]
-nsplit4a = [ len(datetimes4[i].split('/')) for i in range(len(datetimes4)) ]
-nsplit5a = [ len(datetimes5[i].split('/')) for i in range(len(datetimes5)) ]
-
-datetimes1_standardized = []    
-datetimes2_standardized = []    
-datetimes3_standardized = []    
-datetimes4_standardized = []    
-datetimes5_standardized = []    
-
-for i in range(len(datetimes1)):    
-    if np.isin( nsplit1a[i], 3 ):
-        datetimes1_standardized.append( pd.to_datetime( split1b[i], format='%d/%m/%Y' ) )
-    else:
-        datetimes1_standardized.append( pd.to_datetime( split1a[i], format='%Y-%m-%d') )
-
-for i in range(len(datetimes2)):    
-    if np.isin( nsplit2a[i], 3 ):
-        datetimes2_standardized.append( pd.to_datetime( split2b[i], format='%d/%m/%Y' ) )
-    else:
-        datetimes2_standardized.append( pd.to_datetime( split2a[i], format='%Y-%m-%d') )
-
-for i in range(len(datetimes3)):    
-    if np.isin( nsplit3a[i], 3 ):
-        datetimes3_standardized.append( pd.to_datetime( split3b[i], format='%d/%m/%Y' ) )
-    else:
-        datetimes3_standardized.append( pd.to_datetime( split3a[i], format='%Y-%m-%d') )
-
-for i in range(len(datetimes4)):    
-    if np.isin( nsplit4a[i], 3 ):
-        datetimes4_standardized.append( pd.to_datetime( split4b[i], format='%d/%m/%Y' ) )
-    else:
-        datetimes4_standardized.append( pd.to_datetime( split4a[i], format='%Y-%m-%d') )
-
-for i in range(len(datetimes5)):    
-    if np.isin( nsplit5a[i], 3 ):
-        datetimes5_standardized.append( pd.to_datetime( split5b[i], format='%d/%m/%Y' ) )
-    else:
-        datetimes5_standardized.append( pd.to_datetime( split5a[i], format='%Y-%m-%d') )
-
-datetimes = datetimes1_standardized + datetimes2_standardized + datetimes3_standardized + datetimes4_standardized + datetimes5_standardized
-timestamps = [ datetimes[i][0] for i in range(len(datetimes)) ] 
-
-# FIX: stationcodes list [ int64 --> 6-digit str ]
+# CONCATENATE: stationcodes list [ NB: int64 --> 6-digit str ]
 
 stationcodes1 = df1[ df1.columns[1] ]
 stationcodes2 = df2[ df2.columns[1] ]
 stationcodes3 = df3[ df3.columns[1] ]
 stationcodes4 = df4[ df4.columns[1] ]
 stationcodes5 = df5[ df5.columns[1] ]
+stationcodes6 = df6[ df6.columns[1] ]
+stationcodes7 = df7[ df7.columns[1] ]
 
 stationcodes1_6digit = [ str(stationcodes1[i]).zfill(6) for i in range(len(stationcodes1)) ]
 stationcodes2_6digit = [ str(stationcodes2[i]).zfill(6) for i in range(len(stationcodes2)) ]
 stationcodes3_6digit = [ str(stationcodes3[i]).zfill(6) for i in range(len(stationcodes3)) ]
 stationcodes4_6digit = [ str(stationcodes4[i]).zfill(6) for i in range(len(stationcodes4)) ]
 stationcodes5_6digit = [ str(stationcodes5[i]).zfill(6) for i in range(len(stationcodes5)) ]
+stationcodes6_6digit = [ str(stationcodes6[i]).zfill(6) for i in range(len(stationcodes6)) ]
+stationcodes7_6digit = [ str(stationcodes7[i]).zfill(6) for i in range(len(stationcodes7)) ]
 
-stationcodes = stationcodes1_6digit + stationcodes2_6digit + stationcodes3_6digit + stationcodes4_6digit + stationcodes5_6digit 
+stationcodes = stationcodes1_6digit + stationcodes2_6digit + stationcodes3_6digit + stationcodes4_6digit + stationcodes5_6digit + stationcodes6_6digit + stationcodes7_6digit 
 
-# STORE: wall types list --> create dict for integer flag
+# CONCATENATE: exposure_category list --> used to create dict for integer changepoint flag
 
-wall_types1 = list( df1[ df1.columns[2] ] )
-wall_types2 = list( df2[ df2.columns[2] ] )
-wall_types3 = list( df3[ df3.columns[2] ] )
-wall_types4 = list( df4[ df4.columns[2] ] )
-wall_types5 = list( df5[ df5.columns[2] ] )
+exposure_category1 = list( df1[ df1.columns[2] ] )
+exposure_category2 = list( df2[ df2.columns[2] ] )
+exposure_category3 = list( df3[ df3.columns[2] ] )
+exposure_category4 = list( df4[ df4.columns[2] ] )
+exposure_category5 = list( df5[ df5.columns[2] ] )
+exposure_category6 = list( df6[ df6.columns[2] ] )
+exposure_category7 = list( df7[ df7.columns[2] ] )
 
-wall_types = wall_types1 + wall_types2 + wall_types3 + wall_types4 + wall_types5
+exposure_categories = exposure_category1 + exposure_category2 + exposure_category3 + exposure_category4 + exposure_category5 + exposure_category6 + exposure_category7
 
-# FIX: bias estimate list [ entries where no c.i. exists but bias_estimates_97.5 column contains values --> np.nan ]
+# CONCATENATE: bias estimates
 
-bias_estimates1 = df1[ df1.columns[3] ]
-bias_estimates2 = df2[ df2.columns[3] ]
-bias_estimates3 = df3[ df3.columns[3] ]
-bias_estimates4 = df4[ df4.columns[3] ]
-bias_estimates5 = df5[ df5.columns[3] ]
+bias_estimates1 = list( df1[ df1.columns[3] ] )
+bias_estimates2 = list( df2[ df2.columns[3] ] )
+bias_estimates3 = list( df3[ df3.columns[3] ] )
+bias_estimates4 = list( df4[ df4.columns[3] ] )
+bias_estimates5 = list( df5[ df5.columns[3] ] )
+bias_estimates6 = list( df6[ df6.columns[3] ] )
+bias_estimates7 = list( df7[ df7.columns[3] ] )
 
-bias_estimates = list( bias_estimates1 ) + list( bias_estimates2 ) + list( bias_estimates3 ) + list( bias_estimates4 ) + list( bias_estimates5 )
+bias_estimates = bias_estimates1 + bias_estimates2 + bias_estimates3 + bias_estimates4 + bias_estimates5 + bias_estimates6 + bias_estimates7
+
+# COMPUTE + CONCATENATE: 95% c.i. uncertainty
 
 bias_estimates1_025 = df1[ df1.columns[4] ]
 bias_estimates2_025 = df2[ df2.columns[4] ]
 bias_estimates3_025 = df3[ df3.columns[4] ]
 bias_estimates4_025 = df4[ df4.columns[4] ]
 bias_estimates5_025 = df5[ df5.columns[4] ]
+bias_estimates6_025 = df6[ df6.columns[4] ]
+bias_estimates7_025 = df7[ df7.columns[4] ]
 
 bias_estimates1_975 = df1[ df1.columns[5] ]
 bias_estimates2_975 = df2[ df2.columns[5] ]
 bias_estimates3_975 = df3[ df3.columns[5] ]
 bias_estimates4_975 = df4[ df4.columns[5] ]
 bias_estimates5_975 = df5[ df5.columns[5] ]
+bias_estimates6_975 = df6[ df6.columns[5] ]
+bias_estimates7_975 = df7[ df7.columns[5] ]
+              
+bias_uncertainty1 = list( np.subtract( bias_estimates1_975, bias_estimates1_025 ) )
+bias_uncertainty2 = list( np.subtract( bias_estimates2_975, bias_estimates2_025 ) )
+bias_uncertainty3 = list( np.subtract( bias_estimates3_975, bias_estimates3_025 ) )
+bias_uncertainty4 = list( np.subtract( bias_estimates4_975, bias_estimates4_025 ) )
+bias_uncertainty5 = list( np.subtract( bias_estimates5_975, bias_estimates5_025 ) )
+bias_uncertainty6 = list( np.subtract( bias_estimates6_975, bias_estimates6_025 ) )
+bias_uncertainty7 = list( np.subtract( bias_estimates7_975, bias_estimates7_025 ) )
 
-bias_estimates1_975_fixed = []
-bias_estimates2_975_fixed = []
-bias_estimates3_975_fixed = []
-bias_estimates4_975_fixed = []
-bias_estimates5_975_fixed = []
+bias_uncertainties = bias_uncertainty1 + bias_uncertainty2 + bias_uncertainty3 + bias_uncertainty4 + bias_uncertainty5 + bias_uncertainty6 + bias_uncertainty7
+               
+# Index(['index', 'stationcode', 'exposure_category', 'bias_estimate', 'bias_estimate_2.5', 'bias_estimate_97.5', 'source_flag', 'exposurecorrected_flag'], dtype='object')
 
-for i in range(len(bias_estimates1)):    
-    if np.isnan( bias_estimates1[i] ) & np.isnan( bias_estimates1_025[i] ):
-        bias_estimates1_975_fixed.append( np.nan )
-    else:
-        bias_estimates1_975_fixed.append( bias_estimates1_975[i] )
+# CONCATENATE: source_flag
 
-for i in range(len(bias_estimates2)):    
-    if np.isnan( bias_estimates2[i] ) & np.isnan( bias_estimates2_025[i] ):
-        bias_estimates2_975_fixed.append( np.nan )
-    else:
-        bias_estimates2_975_fixed.append( bias_estimates2_975[i] )
+source_flags1 = list( df1[ df1.columns[6] ] )
+source_flags2 = list( df2[ df2.columns[6] ] )
+source_flags3 = list( df3[ df3.columns[6] ] )
+source_flags4 = list( df4[ df4.columns[6] ] )
+source_flags5 = list( df5[ df5.columns[6] ] )
+source_flags6 = list( df6[ df6.columns[6] ] )
+source_flags7 = list( df7[ df7.columns[6] ] )
 
-for i in range(len(bias_estimates3)):    
-    if np.isnan( bias_estimates3[i] ) & np.isnan( bias_estimates3_025[i] ):
-        bias_estimates3_975_fixed.append( np.nan )
-    else:
-        bias_estimates3_975_fixed.append( bias_estimates3_975[i] )
+source_flags = source_flags1 + source_flags2 + source_flags3 + source_flags4 + source_flags5 + source_flags6 + source_flags7
 
-for i in range(len(bias_estimates4)):    
-    if np.isnan( bias_estimates4[i] ) & np.isnan( bias_estimates4_025[i] ):
-        bias_estimates4_975_fixed.append( np.nan )
-    else:
-        bias_estimates4_975_fixed.append( bias_estimates4_975[i] )
+# CONCATENATE: exposurecorrected_flag
 
-for i in range(len(bias_estimates5)):    
-    if np.isnan( bias_estimates5[i] ) & np.isnan( bias_estimates5_025[i] ):
-        bias_estimates5_975_fixed.append( np.nan )
-    else:
-        bias_estimates5_975_fixed.append( bias_estimates5_975[i] )
+exposurecorrected_flags1 = list( df1[ df1.columns[7] ] )
+exposurecorrected_flags2 = list( df2[ df2.columns[7] ] )
+exposurecorrected_flags3 = list( df3[ df3.columns[7] ] )
+exposurecorrected_flags4 = list( df4[ df4.columns[7] ] )
+exposurecorrected_flags5 = list( df5[ df5.columns[7] ] )
+exposurecorrected_flags6 = list( df6[ df6.columns[7] ] )
+exposurecorrected_flags7 = list( df7[ df7.columns[7] ] )
 
-# COMPUTE: 95% c.i. uncertainty
-                
-bias_uncertainty1 = list( np.subtract( bias_estimates1_975_fixed, bias_estimates1_025 ) )
-bias_uncertainty2 = list( np.subtract( bias_estimates2_975_fixed, bias_estimates2_025 ) )
-bias_uncertainty3 = list( np.subtract( bias_estimates3_975_fixed, bias_estimates3_025 ) )
-bias_uncertainty4 = list( np.subtract( bias_estimates4_975_fixed, bias_estimates4_025 ) )
-bias_uncertainty5 = list( np.subtract( bias_estimates5_975_fixed, bias_estimates5_025 ) )
+exposurecorrected_flags = exposurecorrected_flags1 + exposurecorrected_flags2 + exposurecorrected_flags3 + exposurecorrected_flags4 + exposurecorrected_flags5 + exposurecorrected_flags6 + exposurecorrected_flags7
 
-bias_uncertainties = bias_uncertainty1 + bias_uncertainty2 + bias_uncertainty3 + bias_uncertainty4 + bias_uncertainty5
-                
 # CONSTRUCT: dataframe
 
-df = pd.DataFrame( {'datetime':timestamps, 'stationcode':stationcodes, 'wall_type':wall_types, 'bias':bias_estimates, 'uncertainty':bias_uncertainties} )
+df = pd.DataFrame( {'datetime':datetimes, 'stationcode':stationcodes, 'exposure_category':exposure_categories, 'bias':bias_estimates, 
+                    'uncertainty':bias_uncertainties, 'source_flag':source_flags, 'exposurecorrected_flag':exposurecorrected_flags } )
 df.to_pickle( exposure_bias_model_file, compression='bz2' )
 
 #------------------------------------------------------------------------------
