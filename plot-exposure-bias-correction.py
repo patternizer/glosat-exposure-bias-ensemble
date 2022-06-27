@@ -33,37 +33,29 @@ fontsize = 16
 
 df_temp_file = 'DATA/df_temp_qc.pkl'
 df_ebm_file = 'DATA/df_exposure_bias.pkl'
-
 df_temp_ebc_file = 'OUT/df_temp_ebc.pkl'
 df_ebc_file = 'OUT/df_ebc.pkl'
-
-tstart, tend = 1781, 2022
-
-plot_random_stations = False
 sftof_file = 'DATA/sftof.nc' # land/sea mask for zonal weighting
 
+plot_random_stations = False
+
+tstart, tend = 1781, 2022
+ndraws = 10 # number of randomly selected EBC stations
+    
 #------------------------------------------------------------------------------
-# LOAD: temperature .pkl file
+# LOAD: dataframes 
 #------------------------------------------------------------------------------
 
+# LOAD: temperature .pkl file
 df_temp = pd.read_pickle( df_temp_file, compression='bz2' )
 
-#------------------------------------------------------------------------------
 # LOAD: EBC temperature .pkl file
-#------------------------------------------------------------------------------
-
 df_temp_ebc = pd.read_pickle( df_temp_ebc_file, compression='bz2' )
 
-#------------------------------------------------------------------------------
 # LOAD: exposure bias correction dataframe
-#------------------------------------------------------------------------------
-
 df_ebc = pd.read_pickle( df_ebc_file, compression='bz2' )
 
-#------------------------------------------------------------------------------
 # LOAD: exposure bias model
-#------------------------------------------------------------------------------
-
 df_ebm = pd.read_pickle( df_ebm_file, compression='bz2' )
 
 #------------------------------------------------------------------------------
@@ -73,6 +65,10 @@ df_ebm = pd.read_pickle( df_ebm_file, compression='bz2' )
 df_temp = df_temp[ ( df_temp.year >= tstart ) & ( df_temp.year <= tend ) ]
 df_temp_ebc = df_temp_ebc[ ( df_temp_ebc.year >= tstart ) & ( df_temp_ebc.year <= tend ) ]
 df_ebc = df_ebc[ ( df_ebc.year >= tstart ) & ( df_ebc.year <= tend ) ]
+
+#==============================================================================
+# PLOTS
+#==============================================================================
 
 #------------------------------------------------------------------------------
 # PLOT: hemispherical mean temperatures and EBC-corrected temperature
@@ -89,18 +85,14 @@ ax[0].tick_params(labelsize=fontsize)
 ax[0].legend(loc='lower right', ncol=4, fontsize=12)
 ax[0].set_xlabel(xstr, fontsize=fontsize)
 ax[0].set_ylabel(ystr, fontsize=fontsize)
-ax[0].set_title( 'NH mean', fontsize=fontsize)
-#ax[0].set_ylim(-0.15,0.1)
-
+ax[0].set_title( 'NH mean temperature: unweighted', fontsize=fontsize)
 ax[1].plot( df_temp[ (df_temp.stationlat<0) ].groupby('year').mean().iloc[:,0:12].mean(axis=1), ls='-', lw=1, color='blue', label='CRUTEM')
 ax[1].plot( df_temp_ebc[ (df_temp_ebc.stationlat<0) ].groupby('year').mean().iloc[:,0:12].mean(axis=1), ls='-', lw=1, color='red', label='CRUTEM (EBC)')
 ax[1].tick_params(labelsize=fontsize)    
 ax[1].legend(loc='lower right', ncol=4, fontsize=12)
 ax[1].set_xlabel(xstr, fontsize=fontsize)
 ax[1].set_ylabel(ystr, fontsize=fontsize)
-ax[1].set_title( 'SH mean', fontsize=fontsize)
-#ax[1].set_ylim(-0.15,0.1)
-
+ax[1].set_title( 'SH mean temperature: unweighted', fontsize=fontsize)
 plt.savefig(figstr, dpi=300, bbox_inches='tight')
 plt.close(fig)
 
@@ -120,8 +112,8 @@ ax[0].tick_params(labelsize=fontsize)
 ax[0].legend(loc='lower right', ncol=4, fontsize=12)
 ax[0].set_xlabel(xstr, fontsize=fontsize)
 ax[0].set_ylabel(ystr, fontsize=fontsize)
-ax[0].set_title( 'NH mean EBC', fontsize=fontsize)
-ax[0].set_ylim(-0.15,0.1)
+ax[0].set_title( 'NH mean EBC: unweighted', fontsize=fontsize)
+ax[0].set_ylim(-0.1,0.1)
 for i in range(12):    
     ax[1].plot( df_ebc[ (df_ebc.stationlat<0) ].groupby('year').mean().iloc[:,i], label='Month '+str(i+1))
 ax[1].plot( df_ebc[ (df_ebc.stationlat<0) ].groupby('year').mean().iloc[:,0:12].mean(axis=1), ls='-', lw=3, color='black', label='Annual')
@@ -129,60 +121,8 @@ ax[1].tick_params(labelsize=fontsize)
 ax[1].legend(loc='lower right', ncol=4, fontsize=12)
 ax[1].set_xlabel(xstr, fontsize=fontsize)
 ax[1].set_ylabel(ystr, fontsize=fontsize)
-ax[1].set_title( 'SH mean EBC', fontsize=fontsize)
-ax[1].set_ylim(-0.15,0.1)
-
-plt.savefig(figstr, dpi=300, bbox_inches='tight')
-plt.close(fig)
-
-#------------------------------------------------------------------------------
-# PLOT: zonal mean EBC
-#------------------------------------------------------------------------------
-
-figstr = 'zonal-mean-ebc.png'
-xstr = 'Year'
-ystr = 'Bias, °C'
-
-latstep = 10
-
-# Zonal latitude weights
-
-zones = np.arange(-90,90+latstep,latstep) # zone boundaries
-
-zonal_weight = []
-for i in np.arange(-90+latstep/2, 90+latstep/2, latstep): 
-    zonal_weight.append( np.abs( np.cos( (i/180) * np.pi ) ) )
-zonal_weight = np.array( zonal_weight )
-
-# Zonal land fraction weights
-
-nc = netCDF4.Dataset( sftof_file, "r") # 1x1 degree
-lats = nc.variables["lat"][:]
-lons = nc.variables["lon"][:]
-sftof = np.ma.filled(nc.variables["sftof"][:,:],np.nan)
-nc.close()
-
-zonal_land_weight_per_degree = np.nanmean( sftof, axis=1 ) # per degree
-zonal_land_weight_per_degree = zonal_land_weight_per_degree[::-1]/100
-zonal_land_weight = []
-for i in range(len(zones)-1):  
-    zonal_land_weight.append( np.nanmean( zonal_land_weight_per_degree[ zones[i]:zones[i+1] ] ) ) 
-zonal_land_weight = np.array( zonal_land_weight )
-
-zonal_weight = zonal_weight * zonal_land_weight
-
-fig, ax = plt.subplots(figsize=(15,10))          
-for i in range(len(zones)-1):  
-#    zonal_mean = df_ebc[ ( df_ebc.stationlat > zones[i] ) & ( df_ebc.stationlat <= zones[i+1] ) ].groupby('year').mean().iloc[:,0:12].mean(axis=1) * zonal_weight[i]
-    zonal_mean = df_ebc[ ( df_ebc.stationlat > zones[i] ) & ( df_ebc.stationlat <= zones[i+1] ) ].groupby('year').mean().iloc[:,0:12].mean(axis=1) * zonal_weight[i]
-    zonal_mean_rms = np.sqrt( np.nanmean( zonal_mean**2.0 ) ) 
-    if zonal_mean_rms > 0:
-        plt.plot( zonal_mean, label = '[' + str(zones[i]) + ',' + str(zones[i+1]) + ']' + r'$^{\circ}$ latitude')
-plt.tick_params(labelsize=fontsize)    
-plt.legend(loc='lower right', ncol=1, fontsize=12)
-plt.xlabel(xstr, fontsize=fontsize)
-plt.ylabel(ystr, fontsize=fontsize)
-plt.title( 'Zonal mean EBC', fontsize=fontsize)
+ax[1].set_title( 'SH mean EBC: unweighted', fontsize=fontsize)
+ax[1].set_ylim(-0.1,0.1)
 plt.savefig(figstr, dpi=300, bbox_inches='tight')
 plt.close(fig)
             
@@ -193,9 +133,7 @@ plt.close(fig)
 if plot_random_stations == True:
     
     # SAMPLE: n random stationcodes
-    
-    ndraws = 10
-    
+        
     stationcodes_ebm = df_ebm.stationcode.unique()
     nstations = stationcodes_ebm.shape[0]
     rng = np.random.default_rng(20220625) 
